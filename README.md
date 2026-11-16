@@ -35,6 +35,24 @@ that validate themselves on creation.
 Money is handled with `Decimal`, never `float`: amounts are multiplied first and
 rounded once at the end.
 
+## Import
+
+`import_services(path, quarter, catalog)` in `src/praxis_check/importer.py` reads
+a CSV export with one billed service per line:
+
+```
+patient_id,service_date,code,quantity
+p0001,2026-10-02,03000,1
+p0001,2026-10-02,03230,2
+```
+
+The billing codes are looked up in a catalog passed in by the caller. Valid lines
+are grouped into one `TreatmentCase` per patient, sorted by patient ID. Invalid
+lines do not stop the import: each is reported as a `RowError` with its line
+number and a readable message (missing value, invalid date, date outside the
+quarter, unknown billing code, invalid quantity). Only a file that cannot be
+read at all, such as one missing a required column, raises `CsvFormatError`.
+
 ## Stack
 
 | Area | Used |
@@ -78,7 +96,7 @@ not a substitute for an actual billing audit.
 
 ## Status
 
-Work in progress. The project scaffold, continuous integration, and the first domain
-types (`Quarter`, `BillingCode`, `BilledService`, `TreatmentCase`) are in place, with
-tests. Next up are import, rule engine, storage, and UI. Screenshots
-will follow once the UI exists.
+Work in progress. The project scaffold, continuous integration, the first domain
+types (`Quarter`, `BillingCode`, `BilledService`, `TreatmentCase`), and the CSV
+import are in place, with tests. Next up are synthetic sample data, rule engine,
+storage, and UI. Screenshots will follow once the UI exists.
