@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 
 from praxis_check.billed_service import BilledService
@@ -9,7 +9,7 @@ from praxis_check.quarter import Quarter
 class TreatmentCase:
     patient_id: str
     quarter: Quarter
-    services: list[BilledService] = field(default_factory=list)
+    services: tuple[BilledService, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.patient_id.strip():
