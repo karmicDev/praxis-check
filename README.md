@@ -20,6 +20,19 @@ found automatically.
    the estimated amount at stake for each of them.
 4. **Export** a printable report per practice.
 
+## Domain model
+
+The core types live in `src/praxis_check/` and are plain, immutable dataclasses
+that validate themselves on creation.
+
+| Type | Meaning |
+|---|---|
+| `Quarter` | A billing quarter such as `2026Q3`: parses and prints that form, knows its first and last day, answers `day in quarter`, and steps to the next quarter. |
+| `BillingCode` | A billing code from the fee schedule: five-digit code (kept as text so leading zeros survive), description, and points. `amount(point_value)` converts points into euros, rounded half up to whole cents. |
+
+Money is handled with `Decimal`, never `float`: amounts are multiplied first and
+rounded once at the end.
+
 ## Stack
 
 | Area | Used |
@@ -58,6 +71,7 @@ not a substitute for an actual billing audit.
 
 ## Status
 
-Work in progress. The project scaffold is in place; the domain model, import,
-rule engine, storage, and UI are being built step by step. Screenshots will
-follow once the UI exists.
+Work in progress. The project scaffold and the first domain types (`Quarter`,
+`BillingCode`) are in place, with tests. Next up are billed services and
+treatment cases; after that come import, rule engine, storage, and UI. Screenshots
+will follow once the UI exists.
