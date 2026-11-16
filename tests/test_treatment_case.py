@@ -25,26 +25,27 @@ def test_empty_patient_id_is_rejected(patient_id: str) -> None:
 
 
 def test_fields_keep_given_values() -> None:
-    services = [BilledService(CONSULTATION, DAY)]
+    services = (BilledService(CONSULTATION, DAY),)
     case = TreatmentCase(PATIENT_ID, QUARTER, services)
     assert case.patient_id == PATIENT_ID
     assert case.quarter == QUARTER
     assert case.services == services
 
 
-def test_services_default_to_empty_list() -> None:
-    assert TreatmentCase(PATIENT_ID, QUARTER).services == []
+def test_services_default_to_empty_tuple() -> None:
+    assert TreatmentCase(PATIENT_ID, QUARTER).services == ()
 
 
-def test_default_services_are_not_shared() -> None:
-    first = TreatmentCase("p1", QUARTER)
-    second = TreatmentCase("p2", QUARTER)
-    assert first.services is not second.services
+def test_services_cannot_be_changed_after_creation() -> None:
+    case = TreatmentCase(PATIENT_ID, QUARTER)
+    outside = BilledService(CONSULTATION, date(2020, 1, 1))
+    with pytest.raises(AttributeError):
+        case.services.append(outside)  # type: ignore[attr-defined]
 
 
 @pytest.mark.parametrize("day", [QUARTER.start, QUARTER.end])
 def test_service_on_quarter_boundary_is_accepted(day: date) -> None:
-    TreatmentCase(PATIENT_ID, QUARTER, [BilledService(CONSULTATION, day)])
+    TreatmentCase(PATIENT_ID, QUARTER, (BilledService(CONSULTATION, day),))
 
 
 @pytest.mark.parametrize(
@@ -56,7 +57,7 @@ def test_service_on_quarter_boundary_is_accepted(day: date) -> None:
 )
 def test_service_outside_quarter_is_rejected(day: date) -> None:
     with pytest.raises(ValueError, match="outside quarter 2026Q4"):
-        TreatmentCase(PATIENT_ID, QUARTER, [BilledService(CONSULTATION, day)])
+        TreatmentCase(PATIENT_ID, QUARTER, (BilledService(CONSULTATION, day),))
 
 
 def test_total_of_empty_case_is_decimal_zero() -> None:
@@ -69,7 +70,7 @@ def test_total_sums_all_services_with_quantities() -> None:
     case = TreatmentCase(
         PATIENT_ID,
         QUARTER,
-        [BilledService(CONSULTATION, DAY), BilledService(CONVERSATION, DAY, 2)],
+        (BilledService(CONSULTATION, DAY), BilledService(CONVERSATION, DAY, 2)),
     )
     # 31.85 + 2 * 16.31
     assert case.total(POINT_VALUE) == Decimal("64.47")
@@ -79,11 +80,11 @@ def test_codes_are_unique() -> None:
     case = TreatmentCase(
         PATIENT_ID,
         QUARTER,
-        [
+        (
             BilledService(CONSULTATION, DAY),
             BilledService(CONVERSATION, DAY),
             BilledService(CONVERSATION, date(2026, 12, 1)),
-        ],
+        ),
     )
     assert case.codes() == {"03000", "03230"}
 
@@ -96,16 +97,16 @@ def test_count_of_adds_up_quantities() -> None:
     case = TreatmentCase(
         PATIENT_ID,
         QUARTER,
-        [
+        (
             BilledService(CONSULTATION, DAY),
             BilledService(CONVERSATION, DAY, 2),
             BilledService(CONVERSATION, date(2026, 12, 1), 3),
-        ],
+        ),
     )
     assert case.count_of("03230") == 5
     assert case.count_of("03000") == 1
 
 
 def test_count_of_missing_code_is_zero() -> None:
-    case = TreatmentCase(PATIENT_ID, QUARTER, [BilledService(CONSULTATION, DAY)])
+    case = TreatmentCase(PATIENT_ID, QUARTER, (BilledService(CONSULTATION, DAY),))
     assert case.count_of("99999") == 0
