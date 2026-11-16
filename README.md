@@ -30,6 +30,7 @@ that validate themselves on creation.
 | `Quarter` | A billing quarter such as `2026Q3`: parses and prints that form, knows its first and last day, answers `day in quarter`, and steps to the next quarter. |
 | `BillingCode` | A billing code from the fee schedule: five-digit code (kept as text so leading zeros survive), description, and points. `amount(point_value)` converts points into euros, rounded half up to whole cents. |
 | `BilledService` | One line of a practice's billing: a billing code performed on a given day, optionally several times. `amount(point_value)` rounds per code first, then multiplies by the quantity. |
+| `TreatmentCase` | All services one patient received in one quarter. Rejects services dated outside the quarter; answers the case total, the codes used, and how often a code was performed. |
 
 Money is handled with `Decimal`, never `float`: amounts are multiplied first and
 rounded once at the end.
@@ -78,6 +79,6 @@ not a substitute for an actual billing audit.
 ## Status
 
 Work in progress. The project scaffold, continuous integration, and the first domain
-types (`Quarter`, `BillingCode`, `BilledService`) are in place, with tests. Next up are
-treatment cases; after that come import, rule engine, storage, and UI. Screenshots
+types (`Quarter`, `BillingCode`, `BilledService`, `TreatmentCase`) are in place, with
+tests. Next up are import, rule engine, storage, and UI. Screenshots
 will follow once the UI exists.
