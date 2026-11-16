@@ -56,9 +56,14 @@ the pinned version.
 ```bash
 uv sync                  # set up the environment
 uv run pytest            # tests
+uv run pytest --cov=praxis_check --cov-report=term-missing   # tests with coverage
 uv run ruff format .     # format
 uv run ruff check .      # lint
 ```
+
+Every push to `main` and every pull request runs the same checks on GitHub
+Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): formatting,
+lint, and the test suite with a coverage report.
 
 ## Data and privacy
 
@@ -71,7 +76,7 @@ not a substitute for an actual billing audit.
 
 ## Status
 
-Work in progress. The project scaffold and the first domain types (`Quarter`,
-`BillingCode`) are in place, with tests. Next up are billed services and
+Work in progress. The project scaffold, continuous integration, and the first domain
+types (`Quarter`, `BillingCode`) are in place, with tests. Next up are billed services and
 treatment cases; after that come import, rule engine, storage, and UI. Screenshots
 will follow once the UI exists.
