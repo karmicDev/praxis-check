@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from praxis-check!")
+"""Praxis-Check: billing controlling for medical practices."""

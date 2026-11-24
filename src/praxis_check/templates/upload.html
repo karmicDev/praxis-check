@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Check a quarter · Praxis-Check{% endblock %}
+{% block content %}
+<h1>Check a quarter</h1>
+<p>Upload a quarterly billing export as CSV with the columns
+<code>patient_id, service_date, code, quantity</code>.</p>
+{% if error %}
+<article role="alert" aria-invalid="true"><strong>Could not import.</strong> {{ error }}</article>
+{% endif %}
+<form method="post" action="/upload" enctype="multipart/form-data">
+  <label>Practice
+    <input name="practice" value="{{ practice }}" required placeholder="Praxis Dr. Muster">
+  </label>
+  <label>Quarter
+    <input name="quarter" value="{{ quarter }}" required pattern="\d{4}Q[1-4]" placeholder="2026Q4">
+  </label>
+  <label>Billing export (CSV)
+    <input type="file" name="file" accept=".csv,text/csv" required>
+  </label>
+  <button type="submit">Import and check</button>
+</form>
+{% endblock %}

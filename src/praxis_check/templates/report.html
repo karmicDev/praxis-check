@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}{{ run.practice }} {{ run.quarter }} · Praxis-Check{% endblock %}
+{% macro findings_table(findings) %}
+<table>
+  <thead>
+    <tr><th>Patient</th><th>Finding</th><th>Rule</th><th class="amount">Amount</th></tr>
+  </thead>
+  <tbody>
+    {% for f in findings %}
+    <tr>
+      <td>{{ f.patient_id or "whole practice" }}</td>
+      <td>{{ f.message }}</td>
+      <td><code>{{ f.rule }}</code></td>
+      <td class="amount">{{ f.amount | euro }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+{% block content %}
+<hgroup>
+  <h1>{{ run.practice }}, {{ run.quarter }}</h1>
+  <p>{{ run.file_name }}, imported {{ run.imported_at.strftime("%d.%m.%Y %H:%M") }}</p>
+</hgroup>
+
+<section class="numbers">
+  <article><span>Cases</span><strong>{{ run.case_count }}</strong></article>
+  <article><span>Revenue</span><strong>{{ run.revenue | euro }}</strong></article>
+  <article><span>Lost revenue</span><strong class="lost">{{ run.lost_revenue | euro }}</strong></article>
+  <article><span>Audit risk</span><strong class="risk">{{ run.audit_risk | euro }}</strong></article>
+</section>
+
+<p class="no-print"><button onclick="window.print()">Print report</button></p>
+
+<section>
+  <h2>Lost revenue ({{ lost_revenue | length }})</h2>
+  <p class="note">Services that were probably performed but not billed.</p>
+  {% if lost_revenue %}{{ findings_table(lost_revenue) }}{% else %}<p>None found.</p>{% endif %}
+</section>
+
+<section>
+  <h2>Audit risk ({{ audit_risk | length }})</h2>
+  <p class="note">Billed services that an audit would probably question.</p>
+  {% if audit_risk %}{{ findings_table(audit_risk) }}{% else %}<p>None found.</p>{% endif %}
+</section>
+
+{% if run.row_errors %}
+<section>
+  <h2>Rows not imported ({{ run.row_errors | length }})</h2>
+  <details>
+    <summary>Show the lines of the file that could not be read</summary>
+    <table>
+      <thead><tr><th>Line</th><th>Problem</th></tr></thead>
+      <tbody>
+        {% for e in run.row_errors %}
+        <tr><td>{{ e.line_number }}</td><td>{{ e.message }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+{% endif %}
+{% endblock %}

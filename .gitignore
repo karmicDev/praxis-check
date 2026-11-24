@@ -221,3 +221,7 @@ __marimo__/
 
 # local
 /mentor/
+
+# Local SQLite databases
+*.db
+*.db-journal

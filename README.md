@@ -11,92 +11,116 @@ found automatically.
 
 ## What it does
 
-1. **Import** a quarterly billing export from CSV.
+1. **Import** a quarterly billing export from CSV. Broken lines are reported, not fatal.
 2. **Check** it with a rule engine, looking for
-   - services that are common in comparable cases but missing here (lost revenue),
-   - combinations of billing codes that exclude one another (audit risk),
-   - notable deviations from the specialty group average.
-3. **Report** the results on a dashboard: revenue per quarter, the findings, and
-   the estimated amount at stake for each of them.
-4. **Export** a printable report per practice.
+   - companion codes that are missing (lost revenue),
+   - codes billed on the same day although they exclude one another (audit risk),
+   - notable deviations from the specialty group average, in either direction.
+3. **Store** every import run with its services, findings and skipped lines in SQLite.
+4. **Report** the results on a dashboard and in a printable report per practice and quarter,
+   with the estimated amount at stake for every finding.
+5. **Automate** the whole process from the command line, e.g. in a nightly job.
 
-## Domain model
+## Quick start
 
-The core types live in `src/praxis_check/` and are plain, immutable dataclasses
-that validate themselves on creation.
+Requires [uv](https://docs.astral.sh/uv/). Python itself is provisioned by uv in
+the pinned version.
 
-| Type | Meaning |
-|---|---|
-| `Quarter` | A billing quarter such as `2026Q3`: parses and prints that form, knows its first and last day, answers `day in quarter`, and steps to the next quarter. |
-| `BillingCode` | A billing code from the fee schedule: five-digit code (kept as text so leading zeros survive), description, and points. `amount(point_value)` converts points into euros, rounded half up to whole cents. |
-| `BilledService` | One line of a practice's billing: a billing code performed on a given day, optionally several times. `amount(point_value)` rounds per code first, then multiplies by the quantity. |
-| `TreatmentCase` | All services one patient received in one quarter. Rejects services dated outside the quarter; answers the case total, the codes used, and how often a code was performed. |
-
-Money is handled with `Decimal`, never `float`: amounts are multiplied first and
-rounded once at the end.
-
-## Import
-
-`import_services(path, quarter, catalog)` in `src/praxis_check/importer.py` reads
-a CSV export with one billed service per line:
-
-```
-patient_id,service_date,code,quantity
-p0001,2026-10-02,03000,1
-p0001,2026-10-02,03230,2
+```bash
+uv sync
+uv run praxis-check serve          # http://127.0.0.1:8000
 ```
 
-The billing codes are looked up in a catalog passed in by the caller. Valid lines
-are grouped into one `TreatmentCase` per patient, sorted by patient ID. Invalid
-lines do not stop the import: each is reported as a `RowError` with its line
-number and a readable message (missing value, invalid date, date outside the
-quarter, unknown billing code, invalid quantity). Only a file that cannot be
-read at all, such as one missing a required column, raises `CsvFormatError`.
+Open *Check a quarter*, upload `sample_data/practice_2026Q4.csv`, and you get the
+report. The JSON API is documented at `/docs`.
+
+Without the browser:
+
+```bash
+uv run praxis-check generate-sample export.csv --patients 400 --seed 42
+uv run praxis-check run export.csv --practice "Praxis Dr. Muster" --quarter 2026Q4
+```
+
+`run` prints a summary and exits with `2` if the file cannot be read, and with `3`
+if `--fail-on-findings` is set and something was found. The database defaults to
+`praxis_check.db` in the working directory; set `PRAXIS_CHECK_DATABASE_URL` or
+`--database` to change it.
+
+## How it is built
+
+```
+src/praxis_check/
+├── quarter.py, billing_code.py,      domain model: immutable dataclasses
+│   billed_service.py,                that validate themselves
+│   treatment_case.py
+├── importer.py                       CSV → treatment cases, per-row errors
+├── rules.py                          Finding, Rule protocol, three generic rule types, check()
+├── general_practice.py               point value, group averages and the concrete rule set
+├── sample_data.py                    synthetic data generator with planted irregularities
+├── db.py, migrations/                SQLAlchemy 2.0 schema, Alembic migrations
+├── repository.py, pipeline.py        save and load runs; import → check → store
+├── web.py, templates/                FastAPI: JSON API and Jinja2 pages
+└── cli.py                            typer command line
+```
+
+Design decisions:
+
+- **The domain model has no dependencies.** Rules work on plain `TreatmentCase`
+  objects, not on database rows, so they are tested without a database, and the
+  same rules give the same result on cases loaded back from SQLite (there is a test
+  for exactly that).
+- **Rules are data plus a small type.** `MissingCompanion`, `SameDayExclusion` and
+  `GroupAverageDeviation` are generic; which codes they apply to lives in
+  `general_practice.py`. A new rule of a known kind is one line.
+- **Money is `Decimal`, never `float`**, rounded per billing code to whole cents.
+  SQLite has no exact decimal type, so amounts are stored as text through a small
+  `TypeDecorator`.
+- **Server-side rendering, no JavaScript framework.** The application targets a
+  handful of users in their daily work; Jinja2 and a classless stylesheet keep it
+  small and maintainable.
+- **Schema changes go through Alembic.** The app migrates on start, and a test
+  fails if the models and the migrations drift apart.
 
 ## Stack
 
 | Area | Used |
 |---|---|
 | Language | Python 3.14 |
-| Web | FastAPI |
-| UI | Jinja2, server-rendered |
+| Web | FastAPI, Pydantic |
+| UI | Jinja2, server-rendered, Pico.css |
 | Storage | SQLite with SQLAlchemy 2.0, migrations via Alembic |
+| Command line | typer |
 | Tests | pytest |
 | Format and lint | ruff |
 | Project and environment | uv |
-
-Deliberately no JavaScript framework. The application targets a handful of users
-in their daily work, and server-side rendering keeps it small and maintainable.
+| CI | GitHub Actions |
 
 ## Development
 
-Requires [uv](https://docs.astral.sh/uv/). Python itself is provisioned by uv in
-the pinned version.
-
 ```bash
-uv sync                  # set up the environment
-uv run pytest            # tests
-uv run pytest --cov=praxis_check --cov-report=term-missing   # tests with coverage
-uv run ruff format .     # format
-uv run ruff check .      # lint
+uv run pytest                                                # tests
+uv run pytest --cov=praxis_check --cov-report=term-missing   # with coverage
+uv run ruff format .                                          # format
+uv run ruff check .                                           # lint
+uv run alembic revision --autogenerate -m "..."               # new migration
 ```
 
 Every push to `main` and every pull request runs the same checks on GitHub
-Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)): formatting,
-lint, and the test suite with a coverage report.
+Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+## Working with an AI assistant
+
+I wrote the foundation by hand to refresh my Python: the project setup, the domain
+model and the CSV import. From the sample data generator onwards, Claude wrote the
+code following [`CLAUDE.md`](CLAUDE.md), one step at a time; I reviewed every change,
+asked for corrections where needed, and committed it myself.
 
 ## Data and privacy
 
 This project works exclusively with **synthetic data**. It contains no real
-billing, practice, or patient data, and the sample files are generated by a
-script in this repository.
+billing, practice, or patient data; the sample file is generated by
+`praxis-check generate-sample`.
 
-The rules are intentionally **simplified**. They demonstrate the approach and are
-not a substitute for an actual billing audit.
-
-## Status
-
-Work in progress. The project scaffold, continuous integration, the first domain
-types (`Quarter`, `BillingCode`, `BilledService`, `TreatmentCase`), and the CSV
-import are in place, with tests. Next up are synthetic sample data, rule engine,
-storage, and UI. Screenshots will follow once the UI exists.
+Billing codes, points, point value and group averages are **placeholders** inspired
+by the EBM, not the current fee schedule. The rules are intentionally simplified.
+They demonstrate the approach and are not a substitute for an actual billing audit.

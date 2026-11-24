@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Praxis-Check{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
+  <style>
+    .numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; }
+    .numbers article { margin: 0; }
+    .numbers strong { display: block; font-size: 1.5rem; }
+    td.amount, th.amount { text-align: right; white-space: nowrap; }
+    .lost { color: #1a7f37; }
+    .risk { color: #b42318; }
+    .note { font-size: 0.85rem; opacity: 0.75; }
+    @media print {
+      header nav, .no-print { display: none !important; }
+      body { font-size: 11pt; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <ul><li><a href="/"><strong>Praxis-Check</strong></a></li></ul>
+      <ul>
+        <li><a href="/">Dashboard</a></li>
+        <li><a href="/upload">Check a quarter</a></li>
+        <li><a href="/docs">API</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer>
+    <p class="note">Synthetic data and simplified rules. Not a substitute for a real billing audit.</p>
+  </footer>
+</body>
+</html>
