@@ -26,8 +26,37 @@ GROUP_AVERAGE_PER_CASE = {
 }
 
 RULES: tuple[Rule, ...] = (
-    MissingCompanion("missing-primary-care-supplement", FLAT_RATE, PRIMARY_CARE_SUPPLEMENT),
-    MissingCompanion("missing-chronic-care-2", CHRONIC_CARE_1, CHRONIC_CARE_2, min_visit_days=2),
-    SameDayExclusion("conversation-on-assessment-day", GERIATRIC_ASSESSMENT, CONVERSATION),
-    GroupAverageDeviation("group-average-deviation", GROUP_AVERAGE_PER_CASE),
+    MissingCompanion(
+        name="missing-primary-care-supplement",
+        title="Zuschlag zur Versichertenpauschale fehlt",
+        explanation="Fälle mit Versichertenpauschale, in denen der Zuschlag nicht abgerechnet wurde.",
+        trigger=FLAT_RATE,
+        companion=PRIMARY_CARE_SUPPLEMENT,
+    ),
+    MissingCompanion(
+        name="missing-chronic-care-2",
+        title="Chronikerpauschale 2 fehlt",
+        explanation=(
+            "Chroniker mit mindestens zwei Kontakten im Quartal, bei denen nur die erste "
+            "Pauschale abgerechnet wurde."
+        ),
+        trigger=CHRONIC_CARE_1,
+        companion=CHRONIC_CARE_2,
+        min_visit_days=2,
+    ),
+    SameDayExclusion(
+        name="conversation-on-assessment-day",
+        title="Gespräch am Tag des geriatrischen Assessments",
+        explanation="Das Gespräch ist neben dem Basisassessment am selben Tag nicht berechnungsfähig.",
+        primary=GERIATRIC_ASSESSMENT,
+        excluded=CONVERSATION,
+    ),
+    GroupAverageDeviation(
+        name="group-average-deviation",
+        title="Abweichung vom Fachgruppenschnitt",
+        explanation="Leistungen, die je Fall um mehr als 25 % häufiger oder seltener abgerechnet werden.",
+        reference=GROUP_AVERAGE_PER_CASE,
+    ),
 )
+
+RULE_BY_NAME: dict[str, Rule] = {rule.name: rule for rule in RULES}

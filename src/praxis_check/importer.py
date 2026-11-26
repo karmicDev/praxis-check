@@ -33,33 +33,35 @@ def _required(row: Mapping[str, str | None], column: str) -> str:
     """Return the stripped value of a column, or raise if it is missing or blank."""
     value = (row.get(column) or "").strip()
     if not value:
-        raise ValueError(f"missing value for {column!r}")
+        raise ValueError(f"Wert fehlt in Spalte {column!r}")
     return value
 
 
 def _parse_row(
     row: Mapping[str, str | None], quarter: Quarter, catalog: Mapping[str, BillingCode]
 ) -> tuple[str, BilledService]:
-    """Turn one CSV row into (patient_id, service); raise ValueError with a readable message."""
+    """Turn one CSV row into (patient_id, service); raise ValueError with a readable German message."""
     patient_id = _required(row, "patient_id")
 
     date_text = _required(row, "service_date")
     try:
         service_date = date.fromisoformat(date_text)
     except ValueError as err:
-        raise ValueError(f"invalid service date {date_text!r}") from err
+        raise ValueError(f"ungültiges Leistungsdatum {date_text!r}") from err
     if service_date not in quarter:
-        raise ValueError(f"service date {service_date} is outside quarter {quarter}")
+        raise ValueError(f"Leistungsdatum {service_date} liegt außerhalb von Quartal {quarter}")
 
     code = _required(row, "code")
     if code not in catalog:
-        raise ValueError(f"unknown billing code {code!r}")
+        raise ValueError(f"unbekannte Gebührenordnungsposition {code!r}")
 
     quantity_text = _required(row, "quantity")
     try:
         quantity = int(quantity_text)
     except ValueError as err:
-        raise ValueError(f"invalid quantity {quantity_text!r}") from err
+        raise ValueError(f"ungültige Anzahl {quantity_text!r}") from err
+    if quantity < 1:
+        raise ValueError(f"ungültige Anzahl {quantity_text!r}")
 
     return patient_id, BilledService(catalog[code], service_date, quantity)
 
@@ -75,7 +77,7 @@ def import_services(
         reader = csv.DictReader(file)
         missing = [c for c in REQUIRED_COLUMNS if c not in (reader.fieldnames or ())]
         if missing:
-            raise CsvFormatError(f"{path.name}: missing required columns {missing}")
+            raise CsvFormatError(f"{path.name}: Pflichtspalten fehlen: {', '.join(missing)}")
         for line_number, row in enumerate(reader, start=2):
             try:
                 patient_id, service = _parse_row(row, quarter, catalog)

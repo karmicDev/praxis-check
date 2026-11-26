@@ -1,7 +1,8 @@
 """Rule engine: finds irregularities in a quarter's treatment cases.
 
 The rules are deliberately simplified. They show the approach, they do not replace a
-real billing audit against the current EBM.
+real billing audit against the current EBM. Finding messages and rule titles are German,
+because they are shown to the users of the application.
 """
 
 from collections import Counter
@@ -34,8 +35,21 @@ class Finding:
     """None for findings about the whole practice rather than a single case."""
 
 
+def german_number(value: Decimal, places: int = 2) -> str:
+    """1234.5 -> '1.234,50'"""
+    text = f"{value:,.{places}f}"
+    return text.replace(",", "_").replace(".", ",").replace("_", ".")
+
+
 class Rule(Protocol):
     name: str
+    """Stable identifier, stored with every finding."""
+
+    title: str
+    """Short German heading for reports."""
+
+    explanation: str
+    """One German sentence on what the rule looks for."""
 
     def __call__(
         self, cases: Sequence[TreatmentCase], point_value: Decimal
@@ -50,6 +64,8 @@ class MissingCompanion:
     """
 
     name: str
+    title: str
+    explanation: str
     trigger: BillingCode
     companion: BillingCode
     min_visit_days: int = 1
@@ -67,8 +83,8 @@ class MissingCompanion:
                     rule=self.name,
                     kind=FindingKind.LOST_REVENUE,
                     message=(
-                        f"{self.trigger.code} billed without {self.companion.code} "
-                        f"({self.companion.description})"
+                        f"{self.trigger.code} abgerechnet, {self.companion.code} "
+                        f"({self.companion.description}) fehlt"
                     ),
                     amount=self.companion.amount(point_value),
                     patient_id=case.patient_id,
@@ -80,6 +96,8 @@ class SameDayExclusion:
     """``excluded`` must not be billed on the same day as ``primary``."""
 
     name: str
+    title: str
+    explanation: str
     primary: BillingCode
     excluded: BillingCode
 
@@ -101,8 +119,8 @@ class SameDayExclusion:
                     rule=self.name,
                     kind=FindingKind.AUDIT_RISK,
                     message=(
-                        f"{self.excluded.code} billed on {day} together with "
-                        f"{self.primary.code}, which excludes it on the same day"
+                        f"{self.excluded.code} am {day:%d.%m.%Y} neben {self.primary.code} "
+                        f"abgerechnet, am selben Tag ausgeschlossen"
                     ),
                     amount=self.excluded.amount(point_value) * quantity,
                     patient_id=case.patient_id,
@@ -118,6 +136,8 @@ class GroupAverageDeviation:
     """
 
     name: str
+    title: str
+    explanation: str
     reference: Mapping[BillingCode, Decimal]
     tolerance: Decimal = Decimal("0.25")
 
@@ -139,14 +159,15 @@ class GroupAverageDeviation:
                 continue
             difference = abs(counts[code.code] - expected_per_case * case_count)
             kind = FindingKind.AUDIT_RISK if deviation > 0 else FindingKind.LOST_REVENUE
-            direction = "above" if deviation > 0 else "below"
+            direction = "über" if deviation > 0 else "unter"
+            percent = german_number(abs(deviation) * 100, 0)
             yield Finding(
                 rule=self.name,
                 kind=kind,
                 message=(
-                    f"{code.code} ({code.description}) billed {actual_per_case:.2f} times per "
-                    f"case, {abs(deviation):.0%} {direction} the group average of "
-                    f"{expected_per_case:.2f}"
+                    f"{code.code} ({code.description}) {german_number(actual_per_case)}-mal je "
+                    f"Fall abgerechnet, {percent} % {direction} dem Fachgruppenschnitt von "
+                    f"{german_number(expected_per_case)}"
                 ),
                 amount=(code.amount(point_value) * difference).quantize(Decimal("0.01")),
             )

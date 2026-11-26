@@ -13,6 +13,7 @@ from praxis_check.rules import (
     MissingCompanion,
     SameDayExclusion,
     check,
+    german_number,
 )
 from praxis_check.treatment_case import TreatmentCase
 
@@ -37,7 +38,7 @@ def case(patient_id: str, *services: tuple[BillingCode, date] | tuple[BillingCod
 
 
 def test_missing_companion_is_found() -> None:
-    rule = MissingCompanion("supplement", FLAT_RATE, SUPPLEMENT)
+    rule = MissingCompanion("supplement", "t", "e", FLAT_RATE, SUPPLEMENT)
 
     findings = list(rule([case("p1", (FLAT_RATE, DAY_1))], POINT_VALUE))
 
@@ -45,7 +46,7 @@ def test_missing_companion_is_found() -> None:
         Finding(
             rule="supplement",
             kind=FindingKind.LOST_REVENUE,
-            message="03000 billed without 03040 (Supplement)",
+            message="03000 abgerechnet, 03040 (Supplement) fehlt",
             amount=Decimal("5.00"),
             patient_id="p1",
         )
@@ -53,21 +54,21 @@ def test_missing_companion_is_found() -> None:
 
 
 def test_present_companion_gives_no_finding() -> None:
-    rule = MissingCompanion("supplement", FLAT_RATE, SUPPLEMENT)
+    rule = MissingCompanion("supplement", "t", "e", FLAT_RATE, SUPPLEMENT)
     cases = [case("p1", (FLAT_RATE, DAY_1), (SUPPLEMENT, DAY_1))]
 
     assert list(rule(cases, POINT_VALUE)) == []
 
 
 def test_case_without_trigger_gives_no_finding() -> None:
-    rule = MissingCompanion("supplement", FLAT_RATE, SUPPLEMENT)
+    rule = MissingCompanion("supplement", "t", "e", FLAT_RATE, SUPPLEMENT)
 
     assert list(rule([case("p1", (CONVERSATION, DAY_1))], POINT_VALUE)) == []
 
 
 @pytest.mark.parametrize(("days", "expected"), [((DAY_1,), 0), ((DAY_1, DAY_2), 1)])
 def test_min_visit_days_is_respected(days: tuple[date, ...], expected: int) -> None:
-    rule = MissingCompanion("chronic", CHRONIC_1, CHRONIC_2, min_visit_days=2)
+    rule = MissingCompanion("chronic", "t", "e", CHRONIC_1, CHRONIC_2, min_visit_days=2)
     services = [(CHRONIC_1, DAY_1)] + [(FLAT_RATE, day) for day in days]
 
     assert len(list(rule([case("p1", *services)], POINT_VALUE))) == expected
@@ -77,7 +78,7 @@ def test_min_visit_days_is_respected(days: tuple[date, ...], expected: int) -> N
 
 
 def test_excluded_code_on_same_day_is_found() -> None:
-    rule = SameDayExclusion("exclusion", ASSESSMENT, CONVERSATION)
+    rule = SameDayExclusion("exclusion", "t", "e", ASSESSMENT, CONVERSATION)
     cases = [case("p1", (ASSESSMENT, DAY_1), (CONVERSATION, DAY_1, 2))]
 
     findings = list(rule(cases, POINT_VALUE))
@@ -89,7 +90,7 @@ def test_excluded_code_on_same_day_is_found() -> None:
 
 
 def test_excluded_code_on_other_day_is_fine() -> None:
-    rule = SameDayExclusion("exclusion", ASSESSMENT, CONVERSATION)
+    rule = SameDayExclusion("exclusion", "t", "e", ASSESSMENT, CONVERSATION)
     cases = [case("p1", (ASSESSMENT, DAY_1), (CONVERSATION, DAY_2))]
 
     assert list(rule(cases, POINT_VALUE)) == []
@@ -106,14 +107,14 @@ def cases_with_conversations(counts: list[int]) -> list[TreatmentCase]:
 
 
 def test_value_within_tolerance_gives_no_finding() -> None:
-    rule = GroupAverageDeviation("avg", {CONVERSATION: Decimal("1.0")})
+    rule = GroupAverageDeviation("avg", "t", "e", {CONVERSATION: Decimal("1.0")})
 
     # 4 conversations over 4 cases: exactly the average
     assert list(rule(cases_with_conversations([1, 1, 1, 1]), POINT_VALUE)) == []
 
 
 def test_value_above_average_is_an_audit_risk() -> None:
-    rule = GroupAverageDeviation("avg", {CONVERSATION: Decimal("0.5")})
+    rule = GroupAverageDeviation("avg", "t", "e", {CONVERSATION: Decimal("0.5")})
 
     # 4 conversations over 4 cases = 1.0 per case, expected 0.5 -> 2 too many
     [finding] = rule(cases_with_conversations([1, 1, 1, 1]), POINT_VALUE)
@@ -121,22 +122,22 @@ def test_value_above_average_is_an_audit_risk() -> None:
     assert finding.kind is FindingKind.AUDIT_RISK
     assert finding.amount == Decimal("25.60")
     assert finding.patient_id is None
-    assert "100% above" in finding.message
+    assert "100 % über" in finding.message
 
 
 def test_value_below_average_is_lost_revenue() -> None:
-    rule = GroupAverageDeviation("avg", {CONVERSATION: Decimal("1.0")})
+    rule = GroupAverageDeviation("avg", "t", "e", {CONVERSATION: Decimal("1.0")})
 
     # 1 conversation over 4 cases, expected 4 -> 3 missing
     [finding] = rule(cases_with_conversations([1, 0, 0, 0]), POINT_VALUE)
 
     assert finding.kind is FindingKind.LOST_REVENUE
     assert finding.amount == Decimal("38.40")
-    assert "75% below" in finding.message
+    assert "75 % unter" in finding.message
 
 
 def test_no_cases_give_no_finding() -> None:
-    rule = GroupAverageDeviation("avg", {CONVERSATION: Decimal("1.0")})
+    rule = GroupAverageDeviation("avg", "t", "e", {CONVERSATION: Decimal("1.0")})
 
     assert list(rule([], POINT_VALUE)) == []
 
@@ -146,8 +147,8 @@ def test_no_cases_give_no_finding() -> None:
 
 def test_check_runs_all_rules_and_sorts_by_amount() -> None:
     rules = [
-        MissingCompanion("supplement", FLAT_RATE, SUPPLEMENT),
-        SameDayExclusion("exclusion", ASSESSMENT, CONVERSATION),
+        MissingCompanion("supplement", "t", "e", FLAT_RATE, SUPPLEMENT),
+        SameDayExclusion("exclusion", "t", "e", ASSESSMENT, CONVERSATION),
     ]
     cases = [
         case("p1", (FLAT_RATE, DAY_1)),
@@ -167,3 +168,11 @@ def test_check_runs_all_rules_and_sorts_by_amount() -> None:
 
 def test_check_without_rules_finds_nothing() -> None:
     assert check([case("p1", (FLAT_RATE, DAY_1))], POINT_VALUE, []) == []
+
+
+@pytest.mark.parametrize(
+    ("value", "places", "text"),
+    [(Decimal("1234.5"), 2, "1.234,50"), (Decimal("0.6"), 2, "0,60"), (Decimal("80.4"), 0, "80")],
+)
+def test_german_number(value: Decimal, places: int, text: str) -> None:
+    assert german_number(value, places) == text

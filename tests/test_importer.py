@@ -63,15 +63,15 @@ def test_services_keep_their_values(tmp_path: Path) -> None:
 @pytest.mark.parametrize(
     ("row", "message"),
     [
-        (",2026-10-05,03000,1", "missing value for 'patient_id'"),
-        ("  ,2026-10-05,03000,1", "missing value for 'patient_id'"),
-        ("p1,kein-datum,03000,1", "invalid service date 'kein-datum'"),
-        ("p1,2026-09-30,03000,1", "service date 2026-09-30 is outside quarter 2026Q4"),
-        ("p1,2027-01-01,03000,1", "service date 2027-01-01 is outside quarter 2026Q4"),
-        ("p1,2026-10-05,99999,1", "unknown billing code '99999'"),
-        ("p1,2026-10-05,03000,abc", "invalid quantity 'abc'"),
-        ("p1,2026-10-05,03000,0", "Quantity must be at least 1: 0"),
-        ("p1,2026-10-05", "missing value for 'code'"),
+        (",2026-10-05,03000,1", "Wert fehlt in Spalte 'patient_id'"),
+        ("  ,2026-10-05,03000,1", "Wert fehlt in Spalte 'patient_id'"),
+        ("p1,kein-datum,03000,1", "ungültiges Leistungsdatum 'kein-datum'"),
+        ("p1,2026-09-30,03000,1", "Leistungsdatum 2026-09-30 liegt außerhalb von Quartal 2026Q4"),
+        ("p1,2027-01-01,03000,1", "Leistungsdatum 2027-01-01 liegt außerhalb von Quartal 2026Q4"),
+        ("p1,2026-10-05,99999,1", "unbekannte Gebührenordnungsposition '99999'"),
+        ("p1,2026-10-05,03000,abc", "ungültige Anzahl 'abc'"),
+        ("p1,2026-10-05,03000,0", "ungültige Anzahl '0'"),
+        ("p1,2026-10-05", "Wert fehlt in Spalte 'code'"),
     ],
 )
 def test_invalid_row_is_reported(tmp_path: Path, row: str, message: str) -> None:

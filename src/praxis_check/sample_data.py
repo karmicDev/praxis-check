@@ -14,13 +14,13 @@ from praxis_check.billing_code import BillingCode
 from praxis_check.importer import REQUIRED_COLUMNS
 from praxis_check.quarter import Quarter
 
-FLAT_RATE = BillingCode("03000", "Flat-rate fee per insured patient", 150)
-PRIMARY_CARE_SUPPLEMENT = BillingCode("03040", "Supplement for primary care provision", 140)
-CHRONIC_CARE_1 = BillingCode("03220", "Chronic care flat rate 1", 130)
-CHRONIC_CARE_2 = BillingCode("03221", "Chronic care flat rate 2", 40)
-CONVERSATION = BillingCode("03230", "Problem-oriented conversation", 128)
-GERIATRIC_ASSESSMENT = BillingCode("03360", "Geriatric basic assessment", 120)
-EXERCISE_ECG = BillingCode("03321", "Exercise ECG", 200)
+FLAT_RATE = BillingCode("03000", "Versichertenpauschale", 150)
+PRIMARY_CARE_SUPPLEMENT = BillingCode("03040", "Zuschlag hausärztliche Grundversorgung", 140)
+CHRONIC_CARE_1 = BillingCode("03220", "Chronikerpauschale 1", 130)
+CHRONIC_CARE_2 = BillingCode("03221", "Chronikerpauschale 2", 40)
+CONVERSATION = BillingCode("03230", "Problemorientiertes ärztliches Gespräch", 128)
+GERIATRIC_ASSESSMENT = BillingCode("03360", "Hausärztlich-geriatrisches Basisassessment", 120)
+EXERCISE_ECG = BillingCode("03321", "Belastungs-EKG", 200)
 
 SAMPLE_CODES = (
     FLAT_RATE,
