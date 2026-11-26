@@ -1,35 +1,59 @@
 {% extends "base.html" %}
+{% set active = "dashboard" %}
+{% block title %}Übersicht · Praxis-Check{% endblock %}
 {% block content %}
-<h1>Dashboard</h1>
+<div class="page-head">
+  <div>
+    <h1>Geprüfte Quartale</h1>
+    <p>Abrechnungen aller Praxen, die neueste zuerst.</p>
+  </div>
+  {% if runs %}<a class="button" href="/upload">Quartal prüfen</a>{% endif %}
+</div>
+
 {% if runs %}
-<table>
-  <thead>
-    <tr>
-      <th>Practice</th>
-      <th>Quarter</th>
-      <th class="amount">Cases</th>
-      <th class="amount">Revenue</th>
-      <th class="amount">Findings</th>
-      <th class="amount">Lost revenue</th>
-      <th class="amount">Audit risk</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for run in runs %}
-    <tr>
-      <td><a href="/runs/{{ run.id }}">{{ run.practice }}</a><br><span class="note">{{ run.file_name }}, {{ run.imported_at.strftime("%d.%m.%Y %H:%M") }}</span></td>
-      <td>{{ run.quarter }}</td>
-      <td class="amount">{{ run.case_count }}</td>
-      <td class="amount">{{ run.revenue | euro }}</td>
-      <td class="amount">{{ run.finding_count }}</td>
-      <td class="amount lost">{{ run.lost_revenue | euro }}</td>
-      <td class="amount risk">{{ run.audit_risk | euro }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="panel table-scroll">
+  <table class="dashboard">
+    <thead>
+      <tr>
+        <th>Praxis</th>
+        <th>Quartal</th>
+        <th class="num">Fälle</th>
+        <th class="num">Abgerechnet</th>
+        <th>Bilanz</th>
+        <th class="num">Mehrerlös-Potenzial</th>
+        <th class="num">Prüfrisiko</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run, balance in runs %}
+      <tr>
+        <td>
+          <a href="/runs/{{ run.id }}">{{ run.practice }}</a>
+          <span class="meta">{{ run.file_name }}, {{ run.imported_at.strftime("%d.%m.%Y") }}</span>
+        </td>
+        <td>{{ run.quarter | quarter_label }}</td>
+        <td class="num">{{ run.case_count }}</td>
+        <td class="num">{{ run.revenue | euro }}</td>
+        <td>
+          <div class="bar small" aria-hidden="true">
+            <span class="secure" style="width: {{ balance.secure }}%"></span>
+            <span class="at-risk" style="width: {{ balance.at_risk }}%"></span>
+            <span class="missing" style="width: {{ balance.missing }}%"></span>
+          </div>
+        </td>
+        <td class="num lost">{{ run.lost_revenue | euro }}</td>
+        <td class="num risk">{{ run.audit_risk | euro }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 {% else %}
-<p>No quarter has been checked yet.</p>
+<div class="panel empty-state">
+  <h2>Noch kein Quartal geprüft</h2>
+  <p>Laden Sie die Quartalsabrechnung einer Praxis als CSV hoch. Praxis-Check zeigt Ihnen danach,
+  welche Leistungen fehlen und welche bei einer Prüfung gestrichen werden könnten.</p>
+  <a class="button" href="/upload">Quartal prüfen</a>
+</div>
 {% endif %}
-<p><a href="/upload" role="button">Check a quarter</a></p>
 {% endblock %}

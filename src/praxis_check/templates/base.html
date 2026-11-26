@@ -1,40 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Praxis-Check{% endblock %}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.classless.min.css">
-  <style>
-    .numbers { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; }
-    .numbers article { margin: 0; }
-    .numbers strong { display: block; font-size: 1.5rem; }
-    td.amount, th.amount { text-align: right; white-space: nowrap; }
-    .lost { color: #1a7f37; }
-    .risk { color: #b42318; }
-    .note { font-size: 0.85rem; opacity: 0.75; }
-    @media print {
-      header nav, .no-print { display: none !important; }
-      body { font-size: 11pt; }
-    }
-  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
 </head>
 <body>
-  <header>
-    <nav>
-      <ul><li><a href="/"><strong>Praxis-Check</strong></a></li></ul>
-      <ul>
-        <li><a href="/">Dashboard</a></li>
-        <li><a href="/upload">Check a quarter</a></li>
-        <li><a href="/docs">API</a></li>
-      </ul>
-    </nav>
+  <header class="site-header">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true">
+          <rect x="1" y="1" width="20" height="20" rx="4" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M6 11.5l3.2 3.2L16 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Praxis-Check
+      </a>
+      <nav aria-label="Hauptnavigation">
+        <a href="/" {% if active == "dashboard" %}aria-current="page"{% endif %}>Übersicht</a>
+        <a href="/upload" {% if active == "upload" %}aria-current="page"{% endif %}>Quartal prüfen</a>
+        <a class="optional" href="/docs">API</a>
+      </nav>
+    </div>
   </header>
-  <main>
+  <main class="wrap">
     {% block content %}{% endblock %}
   </main>
-  <footer>
-    <p class="note">Synthetic data and simplified rules. Not a substitute for a real billing audit.</p>
+  <footer class="site-footer wrap">
+    Synthetische Daten, vereinfachte Regeln. Ersetzt keine echte Abrechnungsprüfung.
   </footer>
 </body>
 </html>

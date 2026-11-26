@@ -11,8 +11,9 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, computed_field
 from sqlalchemy.orm import Session
 
 from praxis_check import general_practice
@@ -26,6 +27,7 @@ from praxis_check.sample_data import SAMPLE_CATALOG
 
 DEFAULT_DATABASE_URL = "sqlite:///praxis_check.db"
 TEMPLATES = Path(__file__).parent / "templates"
+STATIC = Path(__file__).parent / "static"
 
 
 # API models
@@ -100,6 +102,72 @@ class RunDetail(RunSummary):
         )
 
 
+# View models for the report
+
+
+class Balance(BaseModel):
+    """Widths in percent for the balance bar: billed revenue, the part of it at audit risk,
+    and the revenue that is probably missing. Together they fill the bar."""
+
+    secure: float
+    at_risk: float
+    missing: float
+
+    @classmethod
+    def of(cls, run: RunSummary) -> Balance:
+        width = run.revenue + run.lost_revenue
+        if width <= 0:
+            return cls(secure=0, at_risk=0, missing=0)
+        at_risk = min(run.audit_risk, run.revenue)
+
+        def percent(part: Decimal) -> float:
+            return round(float(part / width * 100), 2)
+
+        return cls(
+            secure=percent(run.revenue - at_risk),
+            at_risk=percent(at_risk),
+            missing=percent(run.lost_revenue),
+        )
+
+
+class RuleGroup(BaseModel):
+    """All findings of one rule, for the summary rows of the report."""
+
+    rule: str
+    title: str
+    explanation: str
+    findings: list[FindingOut]
+
+    @computed_field
+    @property
+    def total(self) -> Decimal:
+        return sum((f.amount for f in self.findings), Decimal(0))
+
+    @computed_field
+    @property
+    def per_case(self) -> bool:
+        return all(f.patient_id is not None for f in self.findings)
+
+
+def group_by_rule(findings: list[FindingOut]) -> list[RuleGroup]:
+    """Group findings per rule, the group with the largest total first."""
+    groups: dict[str, list[FindingOut]] = {}
+    for finding in findings:
+        groups.setdefault(finding.rule, []).append(finding)
+    result = []
+    for name, members in groups.items():
+        rule = general_practice.RULE_BY_NAME.get(name)
+        result.append(
+            RuleGroup(
+                rule=name,
+                title=rule.title if rule else name,
+                explanation=rule.explanation if rule else "",
+                findings=members,
+            )
+        )
+    return sorted(result, key=lambda g: -g.total)
+
+
 # Formatting for the templates
 
 
@@ -107,6 +175,12 @@ def euro(value: Decimal) -> str:
     """German money format: 1.234,56 €"""
     text = f"{value:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
     return f"{text} €"
+
+
+def quarter_label(text: str) -> str:
+    """'2026Q4' -> '4. Quartal 2026'"""
+    quarter = Quarter.parse(text)
+    return f"{quarter.number}. Quartal {quarter.year}"
 
 
 def default_quarter(today: datetime) -> str:
@@ -131,6 +205,8 @@ def create_app(database_url: str | None = None) -> FastAPI:
     )
     templates = Jinja2Templates(directory=TEMPLATES)
     templates.env.filters["euro"] = euro
+    templates.env.filters["quarter_label"] = quarter_label
+    app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
     def get_session() -> Iterator[Session]:
         with session_factory() as session:
@@ -148,7 +224,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
         """Shared by the HTML form and the API. Raises ValueError with a readable message."""
         parsed_quarter = Quarter.parse(quarter.strip())
         if not upload.filename:
-            raise ValueError("Please choose a CSV file")
+            raise ValueError("Bitte wählen Sie eine CSV-Datei aus.")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "upload.csv"
             with path.open("wb") as target:
@@ -165,7 +241,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
                     file_name=upload.filename,
                 )
             except (CsvFormatError, UnicodeDecodeError) as err:
-                raise ValueError(f"The file could not be read: {err}") from err
+                raise ValueError(f"Die Datei konnte nicht gelesen werden: {err}") from err
         session.commit()
         return run.id
 
@@ -201,7 +277,8 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def dashboard(request: Request, session: SessionDep) -> HTMLResponse:
-        return page(request, "dashboard.html", runs=[RunSummary.of(r) for r in list_runs(session)])
+        runs = [RunSummary.of(r) for r in list_runs(session)]
+        return page(request, "dashboard.html", runs=[(run, Balance.of(run)) for run in runs])
 
     @app.get("/upload", response_class=HTMLResponse, include_in_schema=False)
     def upload_form(request: Request) -> HTMLResponse:
@@ -238,8 +315,11 @@ def create_app(database_url: str | None = None) -> FastAPI:
             request,
             "report.html",
             run=run,
-            lost_revenue=[f for f in run.findings if f.kind is FindingKind.LOST_REVENUE],
-            audit_risk=[f for f in run.findings if f.kind is FindingKind.AUDIT_RISK],
+            balance=Balance.of(run),
+            lost_revenue=group_by_rule(
+                [f for f in run.findings if f.kind is FindingKind.LOST_REVENUE]
+            ),
+            audit_risk=group_by_rule([f for f in run.findings if f.kind is FindingKind.AUDIT_RISK]),
         )
 
     return app

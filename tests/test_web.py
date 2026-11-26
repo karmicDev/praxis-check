@@ -5,7 +5,17 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from praxis_check.web import create_app, default_quarter, euro
+from praxis_check.rules import FindingKind
+from praxis_check.web import (
+    Balance,
+    FindingOut,
+    RunSummary,
+    create_app,
+    default_quarter,
+    euro,
+    group_by_rule,
+    quarter_label,
+)
 
 SAMPLE = Path(__file__).parent.parent / "sample_data" / "practice_2026Q4.csv"
 
@@ -54,7 +64,7 @@ def test_api_rejects_unreadable_file(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
-    assert "could not be read" in response.json()["detail"]
+    assert "konnte nicht gelesen werden" in response.json()["detail"]
 
 
 def test_api_unknown_run_is_404(client: TestClient) -> None:
@@ -66,20 +76,21 @@ def test_html_upload_redirects_to_report(client: TestClient) -> None:
 
     assert response.status_code == 200
     assert response.url.path.startswith("/runs/")
-    assert "Praxis Dr. Muster, 2026Q4" in response.text
-    assert "Lost revenue" in response.text
+    assert "Praxis Dr. Muster" in response.text
+    assert "4. Quartal 2026" in response.text
+    assert "Zuschlag zur Versichertenpauschale fehlt" in response.text
 
 
 def test_html_upload_error_keeps_the_form_values(client: TestClient) -> None:
     response = upload(client, "/upload", quarter="2026Q9")
 
     assert response.status_code == 422
-    assert "Could not import" in response.text
+    assert "Import fehlgeschlagen" in response.text
     assert 'value="Praxis Dr. Muster"' in response.text
 
 
 def test_dashboard_lists_runs(client: TestClient) -> None:
-    assert "No quarter has been checked yet" in client.get("/").text
+    assert "Noch kein Quartal geprüft" in client.get("/").text
 
     upload(client)
 
@@ -104,3 +115,63 @@ def test_euro(value: Decimal, text: str) -> None:
 )
 def test_default_quarter_is_the_previous_one(today: datetime, quarter: str) -> None:
     assert default_quarter(today) == quarter
+
+
+def test_quarter_label() -> None:
+    assert quarter_label("2026Q4") == "4. Quartal 2026"
+
+
+def test_static_stylesheet_is_served(client: TestClient) -> None:
+    assert client.get("/static/app.css").status_code == 200
+
+
+def summary(revenue: str, lost: str, risk: str) -> RunSummary:
+    return RunSummary(
+        id=1,
+        practice="P",
+        quarter="2026Q4",
+        file_name="f.csv",
+        imported_at=datetime(2026, 11, 1),
+        case_count=1,
+        revenue=Decimal(revenue),
+        finding_count=0,
+        lost_revenue=Decimal(lost),
+        audit_risk=Decimal(risk),
+    )
+
+
+def test_balance_splits_the_bar() -> None:
+    balance = Balance.of(summary("75", "25", "25"))
+
+    assert (balance.secure, balance.at_risk, balance.missing) == (50.0, 25.0, 25.0)
+
+
+def test_balance_caps_risk_at_revenue_and_handles_zero() -> None:
+    assert Balance.of(summary("10", "0", "50")).at_risk == 100.0
+    assert Balance.of(summary("0", "0", "0")).secure == 0
+
+
+def test_findings_are_grouped_by_rule_largest_total_first() -> None:
+    def finding(rule: str, amount: str, patient: str | None = "p1") -> FindingOut:
+        return FindingOut(
+            rule=rule,
+            kind=FindingKind.LOST_REVENUE,
+            message="m",
+            amount=Decimal(amount),
+            patient_id=patient,
+        )
+
+    groups = group_by_rule(
+        [
+            finding("missing-primary-care-supplement", "5"),
+            finding("missing-chronic-care-2", "8"),
+            finding("missing-primary-care-supplement", "5"),
+        ]
+    )
+
+    assert [(g.rule, g.total, len(g.findings)) for g in groups] == [
+        ("missing-primary-care-supplement", Decimal(10), 2),
+        ("missing-chronic-care-2", Decimal(8), 1),
+    ]
+    assert groups[0].title == "Zuschlag zur Versichertenpauschale fehlt"
+    assert groups[0].per_case

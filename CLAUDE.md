@@ -23,6 +23,8 @@ engine and shows the findings in a web UI. Synthetic data only. See README.md.
 - Do not run git commands. The maintainer reviews, commits and pushes.
 - English identifiers, comments and docs. Domain terms are translated, e.g.
   GOP → `BillingCode`, Behandlungsfall → `TreatmentCase`, Befund → `Finding`.
+- User-facing text is German: templates, rule titles and explanations, finding messages
+  and import errors. Numbers and money in German format (`euro`, `german_number`).
 
 ## Architecture
 
@@ -36,3 +38,4 @@ engine and shows the findings in a web UI. Synthetic data only. See README.md.
   (`Mapped`, `mapped_column`, `select()`). Never 1.x `session.query`.
 - Every model change needs an Alembic migration; `test_migrations_match_the_models` checks it.
 - The web layer (`web.py`) stays thin: parse input, call `pipeline`/`repository`, render.
+- Styling lives in `static/app.css`, no CSS framework and no JavaScript framework.

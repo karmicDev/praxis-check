@@ -39,7 +39,7 @@ def save(session: Session, practice: str = "Praxis Dr. Muster", **overrides) -> 
         "file_name": "services.csv",
         "point_value": POINT_VALUE,
         "cases": [CASE],
-        "errors": [RowError(3, "unknown billing code '99999'")],
+        "errors": [RowError(3, "unbekannte Gebührenordnungsposition '99999'")],
         "findings": [FINDING],
     }
     values.update(overrides)
@@ -66,7 +66,7 @@ def test_saved_run_round_trips(session: Session) -> None:
     assert isinstance(run.revenue, Decimal)
     assert [to_finding(f) for f in run.findings] == [FINDING]
     assert [(e.line_number, e.message) for e in run.row_errors] == [
-        (3, "unknown billing code '99999'")
+        (3, "unbekannte Gebührenordnungsposition '99999'")
     ]
 
 

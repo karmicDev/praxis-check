@@ -1,63 +1,104 @@
 {% extends "base.html" %}
-{% block title %}{{ run.practice }} {{ run.quarter }} · Praxis-Check{% endblock %}
-{% macro findings_table(findings) %}
-<table>
-  <thead>
-    <tr><th>Patient</th><th>Finding</th><th>Rule</th><th class="amount">Amount</th></tr>
-  </thead>
-  <tbody>
-    {% for f in findings %}
-    <tr>
-      <td>{{ f.patient_id or "whole practice" }}</td>
-      <td>{{ f.message }}</td>
-      <td><code>{{ f.rule }}</code></td>
-      <td class="amount">{{ f.amount | euro }}</td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
-{% endmacro %}
-{% block content %}
-<hgroup>
-  <h1>{{ run.practice }}, {{ run.quarter }}</h1>
-  <p>{{ run.file_name }}, imported {{ run.imported_at.strftime("%d.%m.%Y %H:%M") }}</p>
-</hgroup>
+{% block title %}{{ run.practice }}, {{ run.quarter | quarter_label }} · Praxis-Check{% endblock %}
 
-<section class="numbers">
-  <article><span>Cases</span><strong>{{ run.case_count }}</strong></article>
-  <article><span>Revenue</span><strong>{{ run.revenue | euro }}</strong></article>
-  <article><span>Lost revenue</span><strong class="lost">{{ run.lost_revenue | euro }}</strong></article>
-  <article><span>Audit risk</span><strong class="risk">{{ run.audit_risk | euro }}</strong></article>
-</section>
-
-<p class="no-print"><button onclick="window.print()">Print report</button></p>
-
-<section>
-  <h2>Lost revenue ({{ lost_revenue | length }})</h2>
-  <p class="note">Services that were probably performed but not billed.</p>
-  {% if lost_revenue %}{{ findings_table(lost_revenue) }}{% else %}<p>None found.</p>{% endif %}
-</section>
-
-<section>
-  <h2>Audit risk ({{ audit_risk | length }})</h2>
-  <p class="note">Billed services that an audit would probably question.</p>
-  {% if audit_risk %}{{ findings_table(audit_risk) }}{% else %}<p>None found.</p>{% endif %}
-</section>
-
-{% if run.row_errors %}
-<section>
-  <h2>Rows not imported ({{ run.row_errors | length }})</h2>
-  <details>
-    <summary>Show the lines of the file that could not be read</summary>
+{% macro group_list(groups, kind) %}
+<div class="panel">
+  {% for group in groups %}
+  <details class="group">
+    <summary>
+      <h3>{{ group.title }}</h3>
+      <span class="count">{% if group.per_case %}{{ group.findings | length }} {{ "Fall" if group.findings | length == 1 else "Fälle" }}{% else %}Praxis gesamt{% endif %}</span>
+      <span class="num total {{ kind }}">{{ group.total | euro }}</span>
+      <span class="meta">{{ group.explanation }}</span>
+    </summary>
+    {% if group.per_case %}
     <table>
-      <thead><tr><th>Line</th><th>Problem</th></tr></thead>
+      <thead><tr><th>Fall</th><th>Befund</th><th class="num">Betrag</th></tr></thead>
       <tbody>
-        {% for e in run.row_errors %}
-        <tr><td>{{ e.line_number }}</td><td>{{ e.message }}</td></tr>
+        {% for f in group.findings %}
+        <tr><td>{{ f.patient_id }}</td><td>{{ f.message }}</td><td class="num">{{ f.amount | euro }}</td></tr>
         {% endfor %}
       </tbody>
     </table>
+    {% else %}
+    <ul>
+      {% for f in group.findings %}<li>{{ f.message }}: <strong class="{{ kind }}">{{ f.amount | euro }}</strong></li>{% endfor %}
+    </ul>
+    {% endif %}
   </details>
+  {% else %}
+  <p class="empty">Keine Befunde.</p>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ run.practice }}</h1>
+    <p>{{ run.quarter | quarter_label }}, {{ run.case_count }} Behandlungsfälle, importiert am
+      {{ run.imported_at.strftime("%d.%m.%Y um %H:%M") }} aus {{ run.file_name }}</p>
+  </div>
+  <button class="button quiet no-print" type="button" onclick="window.print()">Bericht drucken</button>
+</div>
+
+<section class="panel balance" aria-labelledby="balance-title">
+  <h2 id="balance-title" class="no-print" hidden>Bilanz</h2>
+  <div class="bar" role="img" aria-label="Abgerechnet {{ run.revenue | euro }}, davon mit Prüfrisiko {{ run.audit_risk | euro }}, Mehrerlös-Potenzial {{ run.lost_revenue | euro }}">
+    <span class="secure" style="width: {{ balance.secure }}%"></span>
+    <span class="at-risk" style="width: {{ balance.at_risk }}%"></span>
+    <span class="missing" style="width: {{ balance.missing }}%"></span>
+  </div>
+  <ul class="legend">
+    <li><i class="key secure"></i><span>Abgerechnet</span><strong>{{ run.revenue | euro }}</strong></li>
+    <li><i class="key at-risk"></i><span>davon mit Prüfrisiko</span><strong class="risk">{{ run.audit_risk | euro }}</strong></li>
+    <li><i class="key missing"></i><span>Mehrerlös-Potenzial</span><strong class="lost">{{ run.lost_revenue | euro }}</strong></li>
+  </ul>
+</section>
+
+<section class="findings kind-lost">
+  <header>
+    <h2>Mehrerlös-Potenzial</h2>
+    <p>Leistungen, die vermutlich erbracht, aber nicht abgerechnet wurden.</p>
+  </header>
+  {{ group_list(lost_revenue, "lost") }}
+</section>
+
+<section class="findings kind-risk">
+  <header>
+    <h2>Prüfrisiko</h2>
+    <p>Abgerechnete Leistungen, die bei einer Prüfung voraussichtlich beanstandet werden.</p>
+  </header>
+  {{ group_list(audit_risk, "risk") }}
+</section>
+
+{% if run.row_errors %}
+<section class="findings">
+  <header>
+    <h2>Nicht importierte Zeilen</h2>
+    <p>{{ run.row_errors | length }} Zeilen der Datei konnten nicht gelesen werden und fehlen in der Prüfung.</p>
+  </header>
+  <div class="panel">
+    <details class="group">
+      <summary><h3>Zeilen anzeigen</h3><span class="count">{{ run.row_errors | length }} Zeilen</span><span></span></summary>
+      <table>
+        <thead><tr><th>Zeile</th><th>Problem</th></tr></thead>
+        <tbody>
+          {% for e in run.row_errors %}<tr><td>{{ e.line_number }}</td><td>{{ e.message }}</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </details>
+  </div>
 </section>
 {% endif %}
+
+<script>
+  // Print the full report: open every group before printing, restore afterwards.
+  let closed = [];
+  addEventListener("beforeprint", () => {
+    closed = [...document.querySelectorAll("details:not([open])")];
+    closed.forEach((d) => (d.open = true));
+  });
+  addEventListener("afterprint", () => closed.forEach((d) => (d.open = false)));
+</script>
 {% endblock %}
