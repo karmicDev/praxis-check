@@ -9,6 +9,8 @@ quarter. Supplements that were never claimed go unnoticed, and combinations of
 billing codes that exclude each other only surface during an audit. Both can be
 found automatically.
 
+![Report for one practice and quarter](docs/screenshots/report.png)
+
 ## What it does
 
 1. **Import** a quarterly billing export from CSV. Broken lines are reported, not fatal.
@@ -17,8 +19,9 @@ found automatically.
    - codes billed on the same day although they exclude one another (audit risk),
    - notable deviations from the specialty group average, in either direction.
 3. **Store** every import run with its services, findings and skipped lines in SQLite.
-4. **Report** the results on a dashboard and in a printable report per practice and quarter,
-   with the estimated amount at stake for every finding.
+4. **Report** the results on a dashboard and in a printable report per practice and quarter.
+   A balance bar shows billed revenue, the part of it at audit risk, and the revenue that is
+   probably missing; below it, findings are grouped by rule with the amount at stake.
 5. **Automate** the whole process from the command line, e.g. in a nightly job.
 
 ## Quick start
@@ -31,8 +34,15 @@ uv sync
 uv run praxis-check serve          # http://127.0.0.1:8000
 ```
 
-Open *Check a quarter*, upload `sample_data/practice_2026Q4.csv`, and you get the
+Open *Quartal prüfen*, upload `sample_data/practice_2026Q4.csv`, and you get the
 report. The JSON API is documented at `/docs`.
+
+The user interface is German, because the users are German practices and consultants;
+code, documentation and commits are English.
+
+| Dashboard | Upload |
+|---|---|
+| ![Dashboard with all checked quarters](docs/screenshots/dashboard.png) | ![Upload form](docs/screenshots/upload.png) |
 
 Without the browser:
 
@@ -59,7 +69,7 @@ src/praxis_check/
 ├── sample_data.py                    synthetic data generator with planted irregularities
 ├── db.py, migrations/                SQLAlchemy 2.0 schema, Alembic migrations
 ├── repository.py, pipeline.py        save and load runs; import → check → store
-├── web.py, templates/                FastAPI: JSON API and Jinja2 pages
+├── web.py, templates/, static/       FastAPI: JSON API, Jinja2 pages and one stylesheet
 └── cli.py                            typer command line
 ```
 
@@ -75,9 +85,10 @@ Design decisions:
 - **Money is `Decimal`, never `float`**, rounded per billing code to whole cents.
   SQLite has no exact decimal type, so amounts are stored as text through a small
   `TypeDecorator`.
-- **Server-side rendering, no JavaScript framework.** The application targets a
-  handful of users in their daily work; Jinja2 and a classless stylesheet keep it
-  small and maintainable.
+- **Server-side rendering, no JavaScript and no CSS framework.** The application targets
+  a handful of users in their daily work; Jinja2 and one hand-written stylesheet keep it
+  small and maintainable. Every colour has one meaning: petrol for billed revenue, green
+  for missing revenue, red for audit risk.
 - **Schema changes go through Alembic.** The app migrates on start, and a test
   fails if the models and the migrations drift apart.
 
@@ -87,7 +98,7 @@ Design decisions:
 |---|---|
 | Language | Python 3.14 |
 | Web | FastAPI, Pydantic |
-| UI | Jinja2, server-rendered, Pico.css |
+| UI | Jinja2, server-rendered, plain CSS |
 | Storage | SQLite with SQLAlchemy 2.0, migrations via Alembic |
 | Command line | typer |
 | Tests | pytest |
